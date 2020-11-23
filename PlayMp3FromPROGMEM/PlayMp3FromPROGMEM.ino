@@ -12,14 +12,14 @@
 const char *ssid = "MSHOME";
 const char *password = "0226919072";
 const char *mqtt_server = "192.168.0.103";
-const char *myname = "myname";       //topic
+const char *mp3_frame_byte = "mp3_frame_byte";//topic
 const char *mynowplay = "mynowplay"; //topic
 WiFiClient espClient;
 PubSubClient client(espClient);
 AudioFileSourcePROGMEM *file;
 AudioGeneratorMP3 *mp3;
 AudioOutputI2SNoDAC *out;
-ESP8266Spiram spiram;
+ESP8266Spiram *spiram;
 void setup_wifi()
 {
   delay(10);
@@ -41,11 +41,13 @@ void setup_wifi()
 }
 void callback(char *topic, byte *payload, unsigned int length) //接收回傳
 {
+  byte test[length];
   Serial.println(length);
-  for (int i = 0; i < length; i++)
-  {
-    
-  }
+  //if(topic=="mp3_frame_byte")
+    spiram->write(0x00,payload,length);
+  spiram->read(0x00,test,length);
+  for(int i=0;i<length;i++)
+    Serial.println((String)(char)test[i]); 
 }
 void reconnect()
 {
@@ -57,8 +59,15 @@ void reconnect()
     clientId += String(random(0xffff), HEX);
     if (client.connect(clientId.c_str()))
     {
+      byte b[1]={0x07};
+      byte c[1];
+      spiram->write(0x00,b,1);
+      spiram->read(0x00,c,1);
       Serial.println("connected");
-      client.subscribe(myname);
+      Serial.println(c[0]);
+      Serial.println(client.subscribe(mp3_frame_byte));
+      Serial.println(client.subscribe(mynowplay));
+      Serial.println(client.publish("online", "online"));
     }
     else
     {
@@ -75,8 +84,9 @@ void setup()
   setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
-  spiram.begin();
-
+  spiram  = new ESP8266Spiram(4, 40e6);
+  spiram->begin();
+  spiram->setByteMode();
   audioLogger = &Serial;
   out = new AudioOutputI2SNoDAC();
   mp3 = new AudioGeneratorMP3();
@@ -89,5 +99,4 @@ void loop()
     reconnect();
   }
   client.loop();
-  
 }
