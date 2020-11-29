@@ -38,7 +38,22 @@ void setup_wifi()
 }
 void callback(char *topic, byte *payload, unsigned int length) //接收回傳
 {
- 
+  if ( (String)topic == (String)mp3_frame_byte)
+  {
+    file = new AudioFileSourcePROGMEM(payload, length);
+    out = new AudioOutputI2SNoDAC();
+    mp3 = new AudioGeneratorMP3();
+    if(mp3->begin(file, out))
+    while (mp3->isRunning())
+    {
+      if (!mp3->loop())
+        mp3->stop();
+    }
+    free(file);
+    free(out);
+    free(mp3);
+    client.publish("can_next", "can_next");
+  }
 }
 void reconnect()
 {
@@ -51,16 +66,16 @@ void reconnect()
     if (client.connect(clientId.c_str()))
     {
       Serial.println("connected");
-      Serial.println(client.subscribe(mp3_frame_byte));
-      Serial.println(client.subscribe(mynowplay));
-      Serial.println(client.publish("online", "online"));
+      if (client.subscribe(mp3_frame_byte))
+        Serial.println("mp3_frame_byte has been subscribed");
+      client.subscribe(mynowplay);
     }
     else
     {
       Serial.print("failed, rc=");
       Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
-      delay(5000);
+      Serial.println(" try again in 2 seconds");
+      delay(2000);
     }
   }
 }
@@ -71,8 +86,6 @@ void setup()
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
   audioLogger = &Serial;
-  out = new AudioOutputI2SNoDAC();
-  mp3 = new AudioGeneratorMP3();
 }
 
 void loop()
