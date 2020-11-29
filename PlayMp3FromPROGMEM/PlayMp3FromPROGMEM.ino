@@ -41,8 +41,6 @@ void callback(char *topic, byte *payload, unsigned int length) //接收回傳
   if ( (String)topic == (String)mp3_frame_byte)
   {
     file = new AudioFileSourcePROGMEM(payload, length);
-    out = new AudioOutputI2SNoDAC();
-    mp3 = new AudioGeneratorMP3();
     if(mp3->begin(file, out))
     while (mp3->isRunning())
     {
@@ -50,8 +48,6 @@ void callback(char *topic, byte *payload, unsigned int length) //接收回傳
         mp3->stop();
     }
     free(file);
-    free(out);
-    free(mp3);
     client.publish("can_next", "can_next");
   }
 }
@@ -86,6 +82,8 @@ void setup()
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
   audioLogger = &Serial;
+  out = new AudioOutputI2SNoDAC();
+  mp3 = new AudioGeneratorMP3();
 }
 
 void loop()
