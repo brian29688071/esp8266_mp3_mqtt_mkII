@@ -9,7 +9,7 @@
 #include "ESP8266Spiram.h"
 const char *ssid = "MSHOME";
 const char *password = "0226919072";
-const char *mqtt_server = "192.168.0.103";
+const char *mqtt_server = "192.168.0.107";
 const char *mp3_frame_byte = "mp3_frame_byte";//topic
 const char *mynowplay = "mynowplay"; //topic
 WiFiClient espClient;
