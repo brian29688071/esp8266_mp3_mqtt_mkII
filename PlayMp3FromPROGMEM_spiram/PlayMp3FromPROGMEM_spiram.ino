@@ -11,7 +11,7 @@
 #include "ESP8266Spiram.h"
 const char *ssid = "MSHOME";
 const char *password = "0226919072";
-const char *mqtt_server = "192.168.0.107";
+const char *mqtt_server = "192.168.0.106";
 const char *mp3_frame_byte = "mp3_frame_byte";//topic
 const char *mynowplay = "mynowplay"; //topic
 const unsigned short int one_siprambuffer_size=16384,spiram_piece=8;
@@ -53,8 +53,10 @@ void setup_wifi()
 }
 void callback(char *topic, byte *payload, unsigned int length) //接收回傳
 {
-  if(topic=="mp3_frame_byte")
+  //Serial.println("收到callback");
+  if((String)topic == (String)mp3_frame_byte)
   {
+    //Serial.println("收到data");
     fill(payload,length);
   }
 }
@@ -69,7 +71,7 @@ void reconnect()
     if (client.connect(clientId.c_str()))
     {
       Serial.println("connected");
-      Serial.println(client.subscribe(mp3_frame_byte));
+      Serial.println(client.subscribe(mp3_frame_byte,1));
       Serial.println(client.subscribe(mynowplay));
       Serial.println(client.publish("online", "online"));
     }
@@ -87,6 +89,10 @@ boolean fill(byte *payload, unsigned int length)
   for(int pointer=0;pointer<spiram_piece;pointer++){
     if(spiram_pt[pointer].can_fill)
       {
+        Serial.println(pointer);
+        Serial.println(spiram_pt[pointer].pointer);
+        Serial.println(length);
+        Serial.println("--------------------");
         if(spiram_pt[pointer].pointer+length>spiram_pt[pointer].length){//檢查此塊是否已滿
           spiram_pt[pointer].can_fill=false;
           if(pointer==8)
@@ -122,28 +128,43 @@ void setup()
 
 void loop()
 {
-  if (!client.connected())
+  if (!client.connected()){
+    Serial.printf("重新連接");
     reconnect();
-  client.loop();
+  }
+  if (client.loop()){
+    
+  } 
+  
   if(!spiram_pt[now_play].can_fill){
-    byte data[spiram_pt[now_play].pointer];
-    spiram->read(spiram_pt[now_play].start_position,data,spiram_pt[now_play].pointer);
+    Serial.println("撥放");
+    Serial.println("read_s");
+    byte data[16128];
+    Serial.println("read_m");
+    spiram->read(spiram_pt[now_play].start_position,data,16128);
+    Serial.println("read_e");
     file = new AudioFileSourcePROGMEM(data,spiram_pt[now_play].pointer);
     if(mp3->begin(file, out))
+    Serial.println("開始");
       while(mp3->isRunning())
       {
         if(!mp3->loop()){
+          Serial.println("結束");
           mp3->stop();
           spiram_pt[now_play].can_fill=true;
           spiram_pt[now_play].pointer=0;
           spiram_pt[now_play].data_count=0;
           client.publish("can_next","");
           now_play++;
+          if(now_play==8)
+            now_play=0;
         }
         if (!client.connected())
           reconnect();
         client.loop();
       }
       free(file);
+      
   }
+  
 }
