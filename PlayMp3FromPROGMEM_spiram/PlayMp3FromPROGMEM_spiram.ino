@@ -15,6 +15,8 @@ const char *mqtt_server = "192.168.0.107";
 const char *mp3_frame_byte = "mp3_frame_byte";//topic
 const char *mynowplay = "mynowplay"; //topic
 const unsigned short int one_siprambuffer_size=16384,spiram_piece=8;
+boolean buffer_filled=false;
+int now_play=0;
 WiFiClient espClient;
 PubSubClient client(espClient);
 AudioFileSourcePROGMEM *file;
@@ -23,15 +25,13 @@ AudioOutputI2SNoDAC *out;
 ESP8266Spiram *spiram;
 struct spiram_part
 {
-  unsigned short int start_position;
-  unsigned short int length;
-  unsigned short int pointer;
-  unsigned short int data_length;
-  bool filled=false;
+  unsigned int start_position;//區塊起始位址
+  unsigned int length=one_siprambuffer_size;//區塊長度
+  unsigned int pointer=0;//內部指針
+  unsigned int data_count=0;//總共載入幾次
+  bool can_fill=true;
 };
-spiram_part spiram_part_1,spiram_part_2,spiram_part_3
-            ,spiram_part_4,spiram_part_5,spiram_part_6
-            ,spiram_part_7,spiram_part_8;
+spiram_part spiram_pt[8];
 void setup_wifi()
 {
   delay(10);
@@ -57,7 +57,6 @@ void callback(char *topic, byte *payload, unsigned int length) //接收回傳
   {
     fill(payload,length);
   }
-
 }
 void reconnect()
 {
@@ -85,10 +84,25 @@ void reconnect()
 }
 boolean fill(byte *payload, unsigned int length)
 {
+  for(int pointer=0;pointer<spiram_piece;pointer++){
+    if(spiram_pt[pointer].can_fill)
+      {
+        if(spiram_pt[pointer].pointer+length>spiram_pt[pointer].length){//檢查此塊是否已滿
+          spiram_pt[pointer].can_fill=false;
+          if(pointer==8)
+            buffer_filled=true;//暫存已滿
+        }
+        else{
+          spiram->write(spiram_pt[pointer].pointer,payload,length);//寫入暫存
+          spiram_pt[pointer].pointer+=length;
+          spiram_pt[pointer].data_count++;
+          client.publish("can_next","");
+          break;
+        } 
+      }
+  }
 
-  spiram->write(0x00,payload,length);
   return true;
-
 }
 void setup()
 {
@@ -102,13 +116,34 @@ void setup()
   audioLogger = &Serial;
   out = new AudioOutputI2SNoDAC();
   mp3 = new AudioGeneratorMP3();
+  for(unsigned short int spiram_pe=0;spiram_pe<spiram_piece;spiram_pe++)
+    spiram_pt[spiram_pe].start_position=spiram_pe*one_siprambuffer_size;
 }
 
 void loop()
 {
   if (!client.connected())
-  {
     reconnect();
-  }
   client.loop();
+  if(!spiram_pt[now_play].can_fill){
+    byte data[spiram_pt[now_play].pointer];
+    spiram->read(spiram_pt[now_play].start_position,data,spiram_pt[now_play].pointer);
+    file = new AudioFileSourcePROGMEM(data,spiram_pt[now_play].pointer);
+    if(mp3->begin(file, out))
+      while(mp3->isRunning())
+      {
+        if(!mp3->loop()){
+          mp3->stop();
+          spiram_pt[now_play].can_fill=true;
+          spiram_pt[now_play].pointer=0;
+          spiram_pt[now_play].data_count=0;
+          client.publish("can_next","");
+          now_play++;
+        }
+        if (!client.connected())
+          reconnect();
+        client.loop();
+      }
+      free(file);
+  }
 }
