@@ -56,24 +56,25 @@ void setup_wifi()
 }
 void callback(char *topic, byte *payload, unsigned int length) //接收回傳
 {
-
-  Serial.println("收到callback");
+  //Serial.println("收到callback");
   if ((String)topic == (String)mp3_frame_byte)
   {
-    byte file[length];
-    for (int f = 0; f < length; f++)
-      file[f] = *payload;
     Serial.println("收到data");
+    byte file[length];
+    for (int f = 0; f < length; f++){
+      if(f!=0)
+        file[f] = *payload;
+      else
+        Serial.println(payload[f], HEX);
+    }
+      
     unsigned int length2 = sizeof(file);
-    Serial.println(length, DEC);
-    Serial.println(length2, DEC);
     fill(file, sizeof(file));
   }
   else
-  {
-    unsigned int length = sizeof(payload);
-    Serial.print(length, DEC);
-    Serial.print(*payload, DEC);
+  { 
+    for (int f = 0; f < length; f++)
+      Serial.println(payload[f], HEX);
   }
 }
 void reconnect()
@@ -87,9 +88,10 @@ void reconnect()
     if (client.connect(clientId.c_str()))
     {
       Serial.println("connected");
-      Serial.println(client.subscribe(mp3_frame_byte));
-      Serial.println(client.subscribe(mynowplay));
-      Serial.println(client.publish("online", "online"));
+      client.subscribe(mp3_frame_byte,1);
+      client.subscribe(mynowplay);
+      client.subscribe("order",1);
+      client.publish("online", "online");
     }
     else
     {
@@ -138,7 +140,6 @@ boolean fill(byte payload[], unsigned int length)
       }
     }
   }
-
   return true;
 }
 void setup()
@@ -149,14 +150,13 @@ void setup()
   client.setCallback(callback);
   spiram = new ESP8266Spiram(4, 40e6);
   spiram->begin();
-  spiram->setByteMode();
+  spiram->setSeqMode();
   audioLogger = &Serial;
   out = new AudioOutputI2SNoDAC();
   mp3 = new AudioGeneratorMP3();
   for (unsigned short int spiram_pe = 0; spiram_pe < spiram_piece; spiram_pe++)
     spiram_pt[spiram_pe].start_position = spiram_pe * one_siprambuffer_size;
 }
-
 void loop()
 {
   if (!client.connected())
