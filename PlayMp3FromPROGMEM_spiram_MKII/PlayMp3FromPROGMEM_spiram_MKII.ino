@@ -16,7 +16,7 @@ const char *password = "0226919072";
 const char *mqtt_server = "192.168.0.105";
 const char *mp3_frame_byte = "mp3_frame_byte"; //topic
 const char *mynowplay = "mynowplay";           //topic
-const unsigned short int one_siprambuffer_size = 16384, spiram_piece = 8;
+const unsigned short int one_siprambuffer_size = 32768, spiram_piece = 4  ;
 boolean buffer_filled = false;
 int now_play = 0, data_p = 0;
 WiFiClient espClient;
@@ -25,6 +25,7 @@ AudioFileSourcePROGMEM *file;
 AudioGeneratorMP3 *mp3;
 AudioOutputI2SNoDAC *out;
 ESP8266Spiram *spiram;
+unsigned short int r_sent=0; 
 struct spiram_part
 {
   unsigned int start_position;                 //區塊起始位址
@@ -34,7 +35,13 @@ struct spiram_part
   vector<int> data_position;
   bool can_fill = true;
 };
-spiram_part spiram_pt[8];
+spiram_part spiram_pt[spiram_piece];
+void resent(){
+  if(r_sent==100) 
+    client.publish("can_next", "1");
+  else
+    r_sent++;
+}
 void setup_wifi()
 {
   delay(10);
@@ -60,6 +67,7 @@ void callback(char *topic, byte *payload, unsigned int length) //接收回傳
   if ((String)topic == (String)mp3_frame_byte)
   {
     Serial.println("收到data");
+    r_sent=0;
     byte file[length];
     for (int f = 0; f < length; f++){
       if(f!=0)
@@ -67,7 +75,6 @@ void callback(char *topic, byte *payload, unsigned int length) //接收回傳
       else
         Serial.println(payload[f], HEX);
     }
-      
     unsigned int length2 = sizeof(file);
     fill(file, sizeof(file));
   }
@@ -120,7 +127,8 @@ boolean fill(byte payload[], unsigned int length)
       { //檢查此塊是否已滿
         Serial.println("這塊滿了");
         spiram_pt[pointer].can_fill = false;
-        if (pointer == 8)
+        spiram_pt[pointer].pointer = 0;
+        if (pointer == spiram_piece)
           buffer_filled = true; //暫存已滿
       }
       else
@@ -165,36 +173,14 @@ void loop()
     reconnect();
   }
   client.loop();
-  /*if (!spiram_pt[now_play].can_fill)
+  resent();
+  if (spiram_pt[now_play].can_fill==false)
   {
-    Serial.println("撥放");
-    Serial.println("read_s");
-    if (data_p < spiram_pt[now_play].data_position.size())
-    {
-      byte data[spiram_pt[now_play].data_position[data_p + 1] - spiram_pt[now_play].data_position[data_p]];
-      Serial.println("read_m");
-      spiram->read(spiram_pt[now_play].data_position[data_p], data, spiram_pt[now_play].data_position[data_p + 1] - spiram_pt[now_play].data_position[data_p]);
-      Serial.println("read_e");
-      file = new AudioFileSourcePROGMEM(data, sizeof(data));
-      if (mp3->begin(file, out))
-        Serial.println("開始");
-      while (mp3->isRunning())
-      {
-        Serial.println("while");
-        if (!mp3->loop())
-        {
-          Serial.println("結束");
-          mp3->stop();
-        }
-        if (!client.connected())
-          reconnect();
-        client.loop();
-      }
-      delete (file);
-      data_p++;
-    }
-    else
-    {
-    }
-  }*/
+    Serial.println("u");
+    delay(10);
+    spiram_pt[now_play].can_fill=true;
+    now_play++;
+    if(now_play==spiram_piece)
+      now_play=0;
+  }
 }
