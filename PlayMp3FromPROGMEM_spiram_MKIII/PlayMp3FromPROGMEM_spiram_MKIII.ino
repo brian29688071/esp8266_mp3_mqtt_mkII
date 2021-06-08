@@ -20,14 +20,16 @@ WiFiClient server;
 PubSubClient mqtt(server);
 AudioFileSourceMQTT *file;
 AudioFileSourceSPIRAMBuffer *buffer;
-AudioGeneratorMP3 *mp3; 
+AudioGeneratorMP3 *mp3;
 AudioOutputI2SNoDAC *out;
 void callback(char *topic, byte *payload, unsigned int length)
 {
   Serial.println("收到data");
   if ((String)topic == "mp3_frame_byte")
   {
-
+    Serial.println("load");
+    file->isplay = true;
+    Serial.println(file->isplay);
     for (int f = 0; f < length; f++)
     {
       if (f != 0)
@@ -37,16 +39,15 @@ void callback(char *topic, byte *payload, unsigned int length)
   }
   else if ((String)topic == "play_start")
   {
-    file->isplay=true;
-    Serial.println(file->isplay);
-    mqtt.publish("start_play", "start_play");               
+    Serial.println("開始撥放");
     mqtt.publish("start_play", "start_play");
     mqtt.publish("start_play", "start_play");
-    mp3->begin(buffer,out);
+    mqtt.publish("start_play", "start_play");
+    mp3->begin(buffer, out);
   }
   else if ((String)topic == "end")
   {
-    file->isplay=false;
+    file->isplay = false;
     mqtt.publish("end_play", "end_play");
   }
   else if ((String)topic == "size")
@@ -54,11 +55,11 @@ void callback(char *topic, byte *payload, unsigned int length)
     char c_size[length];
     for (int f = 0; f < length; f++)
     {
-      c_size[f]= (char)payload[f];
+      c_size[f] = (char)payload[f];
       //Serial.println(c_size[f]);
     }
-    f_size=atoi(c_size);
-    file->size=f_size;
+    f_size = atoi(c_size);
+    file->size = f_size;
     //Serial.println(f_size);
   }
 }
@@ -116,20 +117,21 @@ void setup()
   mqtt.setCallback(callback);
   audioLogger = &Serial;
   file = new AudioFileSourceMQTT(&mqtt);
-  buffer=new AudioFileSourceSPIRAMBuffer(file,15, 128*1024);
+  buffer = new AudioFileSourceSPIRAMBuffer(file, 15, 128 * 1024);
   out = new AudioOutputI2SNoDAC();
   mp3 = new AudioGeneratorMP3();
 }
 void loop()
 {
-  if(file->isplay==true)
+  if (file->isplay == true)
   {
     Serial.println("loop");
     mp3->loop();
   }
-  if (!mqtt.connected()) {
+  if (!mqtt.connected())
+  {
     reconnect();
   }
   mqtt.loop();
-
 }
+//錯誤為數據幀8bit頭無法解碼 可能解決辦法:先確認傳來的data是否有誤

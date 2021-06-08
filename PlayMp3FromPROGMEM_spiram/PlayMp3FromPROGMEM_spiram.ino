@@ -165,7 +165,7 @@ void loop()
     reconnect();
   }
   client.loop();
-  /*if (!spiram_pt[now_play].can_fill)
+  if (!spiram_pt[now_play].can_fill)
   {
     Serial.println("撥放");
     Serial.println("read_s");
@@ -196,5 +196,5 @@ void loop()
     else
     {
     }
-  }*/
+  }
 }

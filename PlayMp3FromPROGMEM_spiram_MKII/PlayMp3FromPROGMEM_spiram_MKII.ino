@@ -16,7 +16,7 @@ const char *password = "0226919072";
 const char *mqtt_server = "192.168.0.105";
 const char *mp3_frame_byte = "mp3_frame_byte"; //topic
 const char *mynowplay = "mynowplay";           //topic
-const unsigned short int one_siprambuffer_size = 32768, spiram_piece = 4  ;
+const unsigned short int one_siprambuffer_size = 32768, spiram_piece = 4;
 boolean buffer_filled = false;
 int now_play = 0, data_p = 0;
 WiFiClient espClient;
@@ -25,7 +25,7 @@ AudioFileSourcePROGMEM *file;
 AudioGeneratorMP3 *mp3;
 AudioOutputI2SNoDAC *out;
 ESP8266Spiram *spiram;
-unsigned short int r_sent=0; 
+unsigned short int r_sent = 0;
 struct spiram_part
 {
   unsigned int start_position;                 //區塊起始位址
@@ -36,8 +36,9 @@ struct spiram_part
   bool can_fill = true;
 };
 spiram_part spiram_pt[spiram_piece];
-void resent(){
-  if(r_sent==100) 
+void resent()
+{
+  if (r_sent == 100)
     client.publish("can_next", "1");
   else
     r_sent++;
@@ -67,10 +68,11 @@ void callback(char *topic, byte *payload, unsigned int length) //接收回傳
   if ((String)topic == (String)mp3_frame_byte)
   {
     Serial.println("收到data");
-    r_sent=0;
+    r_sent = 0;
     byte file[length];
-    for (int f = 0; f < length; f++){
-      if(f!=0)
+    for (int f = 0; f < length; f++)
+    {
+      if (f != 0)
         file[f] = *payload;
       else
         Serial.println(payload[f], HEX);
@@ -79,7 +81,7 @@ void callback(char *topic, byte *payload, unsigned int length) //接收回傳
     fill(file, sizeof(file));
   }
   else
-  { 
+  {
     for (int f = 0; f < length; f++)
       Serial.println(payload[f], HEX);
   }
@@ -95,9 +97,9 @@ void reconnect()
     if (client.connect(clientId.c_str()))
     {
       Serial.println("connected");
-      client.subscribe(mp3_frame_byte,1);
+      client.subscribe(mp3_frame_byte, 1);
       client.subscribe(mynowplay);
-      client.subscribe("order",1);
+      client.subscribe("order", 1);
       client.publish("online", "online");
     }
     else
@@ -156,7 +158,7 @@ void setup()
   setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
-  spiram = new ESP8266Spiram(4, 40e6);
+  spiram = new ESP8266Spiram(15, 40e6);
   spiram->begin();
   spiram->setSeqMode();
   audioLogger = &Serial;
@@ -174,13 +176,13 @@ void loop()
   }
   client.loop();
   resent();
-  if (spiram_pt[now_play].can_fill==false)
+  if (spiram_pt[now_play].can_fill == false)
   {
     Serial.println("u");
     delay(10);
-    spiram_pt[now_play].can_fill=true;
+    spiram_pt[now_play].can_fill = true;
     now_play++;
-    if(now_play==spiram_piece)
-      now_play=0;
+    if (now_play == spiram_piece)
+      now_play = 0;
   }
 }
